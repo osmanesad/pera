@@ -177,6 +177,30 @@
             downloadFile(csvContent, 'stok_listesi.csv', 'text/csv');
         }
 
+        function loadFromFile(content, fileType) {
+            const tableBody = document.getElementById('stockTable');
+            tableBody.innerHTML = '';
+            let data = [];
+
+            if (fileType === 'json') {
+                data = JSON.parse(content);
+            } else if (fileType === 'csv') {
+                const rows = content.split('\n');
+                rows.slice(1).forEach(row => {
+                    const cells = row.split(',');
+                    if (cells.length === 2) {
+                        data.push({ barcode: cells[0], quantity: cells[1] });
+                    }
+                });
+            }
+
+            data.forEach(item => {
+                addRow(item.barcode, item.quantity);
+            });
+
+            saveToLocalStorage();
+        }
+
         function addDeleteButton(row) {
             const deleteCell = document.createElement('td');
             const deleteButton = document.createElement('button');
