@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stok Takip Uygulaması</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f9f9f9;
+        }
+        .camera {
+            width: 90%;
+            height: 100px;
+            background-color: #32CD32;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .input-section {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .input-section input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            width: 200px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .input-section input[type="number"] {
+            padding: 10px;
+            font-size: 16px;
+            width: 60px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .input-section button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            background-color: orange;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .input-section button:hover {
+            background-color: darkorange;
+        }
+        table {
+            margin-top: 20px;
+            width: 90%;
+            border-collapse: collapse;
+        }
+        table th, table td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        table th {
+            background-color: #f2f2f2;
+        }
+        .save-section {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .search-section {
+            margin-top: 20px;
+            width: 90%;
+        }
+        .search-section input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .upload-section {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="camera" id="cameraButton">KAMERA</div>
+
+    <div class="input-section">
+        <input type="text" id="barcode" placeholder="Barkod">
+        <input type="number" id="quantity" min="1" value="1">
+        <button id="addButton">EKLE</button>
+    </div>
+
+    <div class="search-section">
+        <input type="text" id="searchInput" placeholder="Tabloda arama yapın...">
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>BARKOD</th>
+                <th>STOK</th>
+                <th>İŞLEM</th>
+            </tr>
+        </thead>
+        <tbody id="stockTable">
+            <!-- Dinamik olarak eklenecek -->
+        </tbody>
+    </table>
+
+    <div class="save-section">
+        <button id="saveJsonButton">JSON İndir</button>
+        <button id="saveExcelButton">Excel İndir</button>
+    </div>
+
+    <div class="upload-section">
+        <input type="file" id="uploadFile" accept=".json,.csv">
+        <button id="uploadButton">Dosya Yükle</button>
+    </div>
+
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <script>
+        function downloadFile(content, fileName, contentType) {
+            const a = document.createElement("a");
+            const file = new Blob([content], { type: contentType });
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
+            a.click();
+        }
+
+        function exportToJSON() {
+            const tableRows = document.querySelectorAll('#stockTable tr');
+            const data = [];
+
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const barcode = cells[0].textContent;
+                    const quantity = cells[1].textContent;
+                    data.push({ barcode, quantity });
+                }
+            });
+
+            const jsonContent = JSON.stringify(data, null, 2);
+            downloadFile(jsonContent, 'stok_listesi.json', 'application/json');
+        }
+
+        function exportToExcel() {
+            let tableRows = document.querySelectorAll('#stockTable tr');
+            let csvContent = "BARKOD,STOK\n";
+
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const barcode = cells[0].textContent;
+                    const quantity = cells[1].textContent;
+                    csvContent += `${barcode},${quantity}\n`;
+                }
+            });
+
+            downloadFile(csvContent, 'stok_listesi.csv', 'text/csv');
+        }
+
+        function addDeleteButton(row) {
+            const deleteCell = document.createElement('td');
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Sil';
+            deleteButton.style.backgroundColor = 'red';
+            deleteButton.style.color = 'white';
+            deleteButton.style.border = 'none';
+            deleteButton.style.borderRadius = '5px';
+            deleteButton.style.padding = '5px 10px';
+            deleteButton.style.cursor = 'pointer';
+
+            deleteButton.addEventListener('click', function() {
+                if (confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
+                    row.remove();
+                    saveToLocalStorage();
+                }
+            });
+
+            deleteCell.appendChild(deleteButton);
+            row.appendChild(deleteCell);
+        }
+
+        function addRow(barcode, quantity) {
+            const tableBody = document.getElementById('stockTable');
+            const newRow = document.createElement('tr');
+
+            const barcodeCell = document.createElement('td');
+            barcodeCell.textContent = barcode;
+
+            const quantityCell = document.createElement('td');
+            quantityCell.textContent = quantity;
+
+            newRow.appendChild(barcodeCell);
+            newRow.appendChild(quantityCell);
+            addDeleteButton(newRow);
+            tableBody.appendChild(newRow);
+        }
+
+        document.getElementById('saveJsonButton').addEventListener('click', function() {
+            exportToJSON();
+        });
+
+        document.getElementById('saveExcelButton').addEventListener('click', function() {
+            exportToExcel();
+        });
+
+        document.getElementById('uploadButton').addEventListener('click', function() {
+            const fileInput = document.getElementById('uploadFile');
+            if (fileInput.files.length === 0) {
+                alert('Lütfen bir dosya seçin!');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const content = event.target.result;
+                const fileType = file.name.endsWith('.json') ? 'json' : 'csv';
+                loadFromFile(content, fileType);
+                alert('Dosya başarıyla yüklendi!');
+            };
+            reader.readAsText(file);
+        });
+
+        function loadFromLocalStorage() {
+            const data = JSON.parse(localStorage.getItem('stockData')) || [];
+            const tableBody = document.getElementById('stockTable');
+            tableBody.innerHTML = '';
+
+            data.forEach(item => {
+                addRow(item.barcode, item.quantity);
+            });
+        }
+
+        function saveToLocalStorage() {
+            const tableRows = document.querySelectorAll('#stockTable tr');
+            const data = [];
+
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const barcode = cells[0].textContent;
+                    const quantity = cells[1].textContent;
+                    data.push({ barcode, quantity });
+                }
+            });
+
+            localStorage.setItem('stockData', JSON.stringify(data));
+        }
+
+        document.getElementById('addButton').addEventListener('click', function() {
+            const barcodeInput = document.getElementById('barcode');
+            const quantityInput = document.getElementById('quantity');
+
+            const barcode = barcodeInput.value.trim();
+            const quantity = parseInt(quantityInput.value);
+
+            if (!barcode) {
+                alert('Lütfen bir barkod girin!');
+                return;
+            }
+
+            if (quantity <= 0 || isNaN(quantity)) {
+                alert('Lütfen geçerli bir stok miktarı girin!');
+                return;
+            }
+
+            const existingRows = document.querySelectorAll('#stockTable tr');
+            for (const row of existingRows) {
+                const existingBarcode = row.querySelector('td:nth-child(1)');
+                if (existingBarcode && existingBarcode.textContent === barcode) {
+                    alert('Bu barkod zaten mevcut!');
+                    return;
+                }
+            }
+
+            addRow(barcode, quantity);
+
+            barcodeInput.value = '';
+            quantityInput.value = 1;
+
+            saveToLocalStorage();
+        });
+
+        document.getElementById('cameraButton').addEventListener('click', async function() {
+            const codeReader = new ZXing.BrowserBarcodeReader();
+            try {
+                const videoInputDevices = await codeReader.listVideoInputDevices();
+                if (videoInputDevices.length === 0) {
+                    alert('Kamera bulunamadı!');
+                    return;
+                }
+                const selectedDeviceId = videoInputDevices[0].deviceId;
+                const result = await codeReader.decodeOnceFromVideoDevice(selectedDeviceId, 'cameraButton');
+                document.getElementById('barcode').value = result.text;
+                alert(`Barkod: ${result.text}`);
+            } catch (err) {
+                console.error(err);
+                alert('Barkod okunamadı.');
+            } finally {
+                codeReader.reset();
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const filter = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#stockTable tr');
+
+            rows.forEach(row => {
+                const barcode = row.querySelector('td:nth-child(1)').textContent.toLowerCase();
+                if (barcode.includes(filter)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        window.addEventListener('load', loadFromLocalStorage);
+    </script>
+</body>
+</html>
