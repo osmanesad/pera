@@ -27,6 +27,7 @@
             font-weight: bold;
             cursor: pointer;
             border-radius: 5px;
+            display: none; /* Kamera butonunu devre dışı bırak */
         }
         .input-section {
             margin-top: 10px;
@@ -161,7 +162,6 @@
         <button id="uploadButton">Dosya Yükle</button>
     </div>
 
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
     <script>
         function downloadFile(content, fileName, contentType) {
             const a = document.createElement("a");
@@ -247,38 +247,7 @@
                 }
             });
 
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Düzenle';
-            editButton.style.backgroundColor = 'blue';
-            editButton.style.color = 'white';
-            editButton.style.border = 'none';
-            editButton.style.borderRadius = '5px';
-            editButton.style.padding = '5px 10px';
-            editButton.style.marginLeft = '5px';
-            editButton.style.cursor = 'pointer';
-
-            editButton.addEventListener('click', function() {
-                const barcodeCell = row.querySelector('td:nth-child(1)');
-                const quantityCell = row.querySelector('td:nth-child(2)');
-
-                const newBarcode = prompt('Yeni barkod girin:', barcodeCell.textContent);
-                if (newBarcode !== null && newBarcode.trim() !== '') {
-                    const newQuantity = prompt('Yeni stok miktarını girin:', quantityCell.textContent);
-                    if (newQuantity !== null && !isNaN(newQuantity) && newQuantity > 0) {
-                        barcodeCell.textContent = newBarcode.trim();
-                        quantityCell.textContent = newQuantity.trim();
-                        saveToLocalStorage();
-                        alert('Ürün başarıyla güncellendi!');
-                    } else {
-                        alert('Geçerli bir stok miktarı girilmedi!');
-                    }
-                } else {
-                    alert('Geçerli bir barkod girilmedi!');
-                }
-            });
-
             deleteCell.appendChild(deleteButton);
-            deleteCell.appendChild(editButton);
             row.appendChild(deleteCell);
         }
 
@@ -382,26 +351,6 @@
             quantityInput.value = 1;
 
             saveToLocalStorage();
-        });
-
-        document.getElementById('cameraButton').addEventListener('click', async function() {
-            const codeReader = new ZXing.BrowserBarcodeReader();
-            try {
-                const videoInputDevices = await codeReader.listVideoInputDevices();
-                if (videoInputDevices.length === 0) {
-                    alert('Kamera bulunamadı!');
-                    return;
-                }
-                const selectedDeviceId = videoInputDevices[0].deviceId;
-                const result = await codeReader.decodeOnceFromVideoDevice(selectedDeviceId, 'cameraButton');
-                document.getElementById('barcode').value = result.text;
-                alert(`Barkod: ${result.text}`);
-            } catch (err) {
-                console.error(err);
-                alert('Barkod okunamadı.');
-            } finally {
-                codeReader.reset();
-            }
         });
 
         document.getElementById('searchInput').addEventListener('input', function() {
